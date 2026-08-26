@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 
@@ -24,27 +24,26 @@ export function BiblePage() {
     enabled: Boolean(selectedVersion),
   })
 
-  const chapterQuery = useQuery({
-    queryKey: ['bible', 'chapter', selectedVersion, selectedBook, selectedChapter],
-    queryFn: () => getBibleChapter(selectedVersion, selectedBook, selectedChapter),
-    enabled: Boolean(selectedVersion && selectedBook && selectedChapter > 0),
-  })
+  const effectiveBook = useMemo(() => {
+    if (!booksQuery.data?.length) {
+      return selectedBook
+    }
+
+    return booksQuery.data.some((book) => book.abbrev === selectedBook)
+      ? selectedBook
+      : booksQuery.data[0].abbrev
+  }, [booksQuery.data, selectedBook])
 
   const selectedBookData = useMemo(
-    () => booksQuery.data?.find((book) => book.abbrev === selectedBook),
-    [booksQuery.data, selectedBook],
+    () => booksQuery.data?.find((book) => book.abbrev === effectiveBook),
+    [booksQuery.data, effectiveBook],
   )
 
-  useEffect(() => {
-    if (!booksQuery.data?.length) {
-      return
-    }
-
-    if (!booksQuery.data.some((book) => book.abbrev === selectedBook)) {
-      setSelectedBook(booksQuery.data[0].abbrev)
-      setSelectedChapter(1)
-    }
-  }, [booksQuery.data, selectedBook])
+  const chapterQuery = useQuery({
+    queryKey: ['bible', 'chapter', selectedVersion, effectiveBook, selectedChapter],
+    queryFn: () => getBibleChapter(selectedVersion, effectiveBook, selectedChapter),
+    enabled: Boolean(selectedVersion && effectiveBook && selectedChapter > 0),
+  })
 
   const isLoading = versionsQuery.isLoading || booksQuery.isLoading || chapterQuery.isLoading
 
@@ -100,7 +99,7 @@ export function BiblePage() {
         <label className="grid gap-2 text-sm font-medium text-slate-800">
           Livro
           <select
-            value={selectedBook}
+            value={effectiveBook}
             onChange={(event) => {
               setSelectedBook(event.target.value)
               setSelectedChapter(1)
@@ -142,7 +141,7 @@ export function BiblePage() {
                   setSelectedChapter(1)
                 }}
                 className={`flex h-9 w-full items-center justify-between rounded-md px-2 text-left text-sm transition ${
-                  book.abbrev === selectedBook
+                  book.abbrev === effectiveBook
                     ? 'bg-sky-900 text-white'
                     : 'text-slate-700 hover:bg-slate-100'
                 }`}

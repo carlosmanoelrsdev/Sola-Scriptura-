@@ -1,11 +1,13 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { Navigate, createBrowserRouter } from 'react-router-dom'
 
 import { PrivateLayout } from '@/layouts/private-layout'
 import { PublicLayout } from '@/layouts/public-layout'
 import { BiblePage } from '@/pages/bible-page'
 import { DashboardPage } from '@/pages/dashboard-page'
+import { DevotionalsPage } from '@/pages/devotionals-page'
 import { HomePage } from '@/pages/home-page'
 import { LoginPage } from '@/pages/login-page'
+import { ProfilePage } from '@/pages/profile-page'
 import { RegisterPage } from '@/pages/register-page'
 
 export const appRouter = createBrowserRouter([
@@ -22,6 +24,11 @@ export const appRouter = createBrowserRouter([
   {
     path: '/app',
     element: <PrivateLayout />,
-    children: [{ path: 'dashboard', element: <DashboardPage /> }],
+    children: [
+      { index: true, element: <Navigate to="/app/dashboard" replace /> },
+      { path: 'dashboard', element: <DashboardPage /> },
+      { path: 'devotionals', element: <DevotionalsPage /> },
+      { path: 'profile', element: <ProfilePage /> },
+    ],
   },
 ])
