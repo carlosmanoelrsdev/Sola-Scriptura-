@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import br.com.carlos.solascriptura.repository.UserRepository;
+import br.com.carlos.solascriptura.repository.ReadingRepository;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -27,8 +28,12 @@ class AuthControllerIntegrationTest {
 	@Autowired
 	private UserRepository userRepository;
 
+	@Autowired
+	private ReadingRepository readingRepository;
+
 	@BeforeEach
 	void setUp() {
+		readingRepository.deleteAll();
 		userRepository.deleteAll();
 	}
 
