@@ -1,17 +1,22 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { CheckCircle2, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getBibleBooks, getBibleChapter, getBibleVersions } from '@/services/bible-service'
+import { getAuthToken } from '@/services/auth-token'
+import { registerReading } from '@/services/reading-service'
 
 const DEFAULT_VERSION = 'ACF'
 const DEFAULT_BOOK = 'jo'
 const DEFAULT_CHAPTER = 3
 
 export function BiblePage() {
+  const queryClient = useQueryClient()
   const [selectedVersion, setSelectedVersion] = useState(DEFAULT_VERSION)
   const [selectedBook, setSelectedBook] = useState(DEFAULT_BOOK)
   const [selectedChapter, setSelectedChapter] = useState(DEFAULT_CHAPTER)
+  const token = getAuthToken()
 
   const versionsQuery = useQuery({
     queryKey: ['bible', 'versions'],
@@ -47,12 +52,27 @@ export function BiblePage() {
 
   const isLoading = versionsQuery.isLoading || booksQuery.isLoading || chapterQuery.isLoading
 
+  const registerReadingMutation = useMutation({
+    mutationFn: registerReading,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+
   function goToPreviousChapter() {
     setSelectedChapter((current) => Math.max(1, current - 1))
   }
 
   function goToNextChapter() {
     setSelectedChapter((current) => current + 1)
+  }
+
+  function markChapterAsRead() {
+    registerReadingMutation.mutate({
+      version: selectedVersion,
+      book: effectiveBook,
+      chapter: selectedChapter,
+    })
   }
 
   return (
@@ -163,6 +183,28 @@ export function BiblePage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {token ? (
+                <button
+                  type="button"
+                  onClick={markChapterAsRead}
+                  disabled={registerReadingMutation.isPending || chapterQuery.isError || isLoading}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-sky-900 px-3 text-sm font-medium text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {registerReadingMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Marcar como lido
+                </button>
+              ) : (
+                <Link
+                  to="/login"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 transition hover:bg-slate-50"
+                >
+                  Entrar para registrar
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={goToPreviousChapter}
@@ -197,6 +239,18 @@ export function BiblePage() {
             </div>
           ) : (
             <div className="px-5 py-6 md:px-8 md:py-8">
+              {registerReadingMutation.isSuccess ? (
+                <p className="mx-auto mb-6 max-w-3xl rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                  Capitulo marcado como lido.
+                </p>
+              ) : null}
+
+              {registerReadingMutation.isError ? (
+                <p className="mx-auto mb-6 max-w-3xl rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  Este capitulo ja pode estar marcado como lido ou a sessao expirou.
+                </p>
+              ) : null}
+
               <div className="mx-auto max-w-3xl space-y-5">
                 {chapterQuery.data?.verses.map((verse) => (
                   <p key={verse.verse} className="font-serif text-xl leading-9 text-slate-900">
