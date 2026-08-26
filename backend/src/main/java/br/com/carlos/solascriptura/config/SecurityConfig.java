@@ -43,7 +43,7 @@ public class SecurityConfig {
 								response.setStatus(HttpServletResponse.SC_FORBIDDEN)))
 				.authorizeHttpRequests(authorize -> authorize
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-						.requestMatchers("/api/auth/register", "/api/auth/login", "/api/health").permitAll()
+						.requestMatchers("/api/auth/register", "/api/auth/login", "/api/health", "/api/bible/**").permitAll()
 						.anyRequest().authenticated())
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 				.build();
