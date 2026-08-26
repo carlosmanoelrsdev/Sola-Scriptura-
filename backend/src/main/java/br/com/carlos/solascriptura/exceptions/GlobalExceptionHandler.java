@@ -4,6 +4,8 @@ import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -41,6 +43,16 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ExternalProviderException.class)
 	public ResponseEntity<Map<String, Object>> handleProvider(ExternalProviderException ex) {
 		return build(HttpStatus.BAD_GATEWAY, ex.getMessage());
+	}
+
+	@ExceptionHandler(AuthenticationException.class)
+	public ResponseEntity<Map<String, Object>> handleAuthentication(AuthenticationException ex) {
+		return build(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+	}
+
+	@ExceptionHandler(AccessDeniedException.class)
+	public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+		return build(HttpStatus.FORBIDDEN, "Access denied");
 	}
 
 	@ExceptionHandler(Exception.class)
