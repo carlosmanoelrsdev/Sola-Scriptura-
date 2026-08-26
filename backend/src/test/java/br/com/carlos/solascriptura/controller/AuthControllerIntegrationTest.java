@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import br.com.carlos.solascriptura.repository.UserRepository;
 import br.com.carlos.solascriptura.repository.ReadingRepository;
+import br.com.carlos.solascriptura.repository.DevotionalRepository;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -31,8 +32,12 @@ class AuthControllerIntegrationTest {
 	@Autowired
 	private ReadingRepository readingRepository;
 
+	@Autowired
+	private DevotionalRepository devotionalRepository;
+
 	@BeforeEach
 	void setUp() {
+		devotionalRepository.deleteAll();
 		readingRepository.deleteAll();
 		userRepository.deleteAll();
 	}

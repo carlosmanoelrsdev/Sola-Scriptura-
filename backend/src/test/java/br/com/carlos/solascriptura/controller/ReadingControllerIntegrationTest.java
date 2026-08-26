@@ -23,6 +23,7 @@ import br.com.carlos.solascriptura.entities.Reading;
 import br.com.carlos.solascriptura.entities.User;
 import br.com.carlos.solascriptura.repository.ReadingRepository;
 import br.com.carlos.solascriptura.repository.UserRepository;
+import br.com.carlos.solascriptura.repository.DevotionalRepository;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -39,8 +40,12 @@ class ReadingControllerIntegrationTest {
 	@Autowired
 	private ReadingRepository readingRepository;
 
+	@Autowired
+	private DevotionalRepository devotionalRepository;
+
 	@BeforeEach
 	void setUp() {
+		devotionalRepository.deleteAll();
 		readingRepository.deleteAll();
 		userRepository.deleteAll();
 	}
