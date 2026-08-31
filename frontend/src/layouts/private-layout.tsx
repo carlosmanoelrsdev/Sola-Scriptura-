@@ -45,6 +45,9 @@ export function PrivateLayout() {
             <Link className="shrink-0 rounded-md px-3 py-2 text-slate-200 transition hover:bg-slate-800 hover:text-white md:px-0 md:py-0 md:hover:bg-transparent" to="/app/profile">
               Perfil
             </Link>
+            <Link className="shrink-0 rounded-md px-3 py-2 text-slate-200 transition hover:bg-slate-800 hover:text-white md:px-0 md:py-0 md:hover:bg-transparent" to="/app/biblia-teste-login">
+              Biblia-teste-login
+            </Link>
           </nav>
           <button
             type="button"

@@ -9,6 +9,7 @@ import { HomePage } from '@/pages/home-page'
 import { LoginPage } from '@/pages/login-page'
 import { ProfilePage } from '@/pages/profile-page'
 import { RegisterPage } from '@/pages/register-page'
+import { BibleTestLoginPage } from '@/pages/bible-test-login-page'
 
 export const appRouter = createBrowserRouter([
   {
@@ -29,6 +30,7 @@ export const appRouter = createBrowserRouter([
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'devotionals', element: <DevotionalsPage /> },
       { path: 'profile', element: <ProfilePage /> },
+      { path: 'biblia-teste-login', element: <BibleTestLoginPage /> },
     ],
   },
 ])
