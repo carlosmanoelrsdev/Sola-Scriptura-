@@ -12,14 +12,16 @@ const DEFAULT_VERSION = 'ACF'
 const DEFAULT_BOOK = 'gn'
 const DEFAULT_CHAPTER = 1
 
-export function BibleTestLoginPage() {
+export function BibleLoginPage() {
     const queryClient = useQueryClient()
     const [selectedVersion, setSelectedVersion] = useState(DEFAULT_VERSION)
     const [selectedBook, setSelectedBook] = useState(DEFAULT_BOOK)
     const [selectedChapter, setSelectedChapter] = useState(DEFAULT_CHAPTER)
+    const [isBookDropdownOpen, setIsBookDropdownOpen] = useState(false)
 
     // Estado local para controlar instantaneamente os capítulos marcados como lidos nesta sessão
     const [readChapters, setReadChapters] = useState<Record<string, boolean>>({})
+    const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set())
 
     const token = getAuthToken()
 
@@ -92,6 +94,7 @@ export function BibleTestLoginPage() {
         onSuccess: () => {
             // Marca imediatamente no estado local para feedback visual instantâneo
             setReadChapters((prev) => ({ ...prev, [currentChapterKey]: true }))
+            setSelectedVerses(new Set())
             // Atualiza o dashboard em segundo plano
             queryClient.invalidateQueries({ queryKey: ['dashboard'] })
         },
@@ -171,34 +174,52 @@ export function BibleTestLoginPage() {
                             <input
                                 type="number"
                                 min={1}
-                                value={selectedChapter}
-                                onChange={(event) => setSelectedChapter(Math.max(1, Number(event.target.value)))}
-                                className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-sky-700 focus:ring-2 focus:ring-sky-100"
-                            />
-                        </label>
+                                    max={150}
+                                    value={selectedChapter}
+                                    onChange={(event) => setSelectedChapter(Math.max(1, Number(event.target.value)))}
+                                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-sky-700 focus:ring-2 focus:ring-sky-100"
+                                />
+                            </label>
                     </div>
 
                     <div className="mt-6 border-t border-slate-200 pt-5">
-                        <p className="mb-3 text-xs font-semibold uppercase text-slate-500">Lista de Livros</p>
-                        <div className="max-h-[460px] space-y-1 overflow-y-auto pr-1">
-                            {booksQuery.data?.map((book) => (
-                                <button
-                                    key={book.id}
-                                    type="button"
-                                    onClick={() => {
-                                        setSelectedBook(book.abbrev)
-                                        setSelectedChapter(1)
-                                    }}
-                                    className={`flex h-9 w-full items-center justify-between rounded-md px-2 text-left text-sm transition ${
-                                        book.abbrev === effectiveBook
-                                            ? 'bg-sky-900 text-white font-medium'
-                                            : 'text-slate-700 hover:bg-slate-100'
-                                    }`}
-                                >
-                                    <span className="truncate">{book.name}</span>
-                                    <span className="ml-2 text-xs opacity-75">{book.testament}</span>
-                                </button>
-                            ))}
+                        <p className="mb-3 text-xs font-semibold uppercase text-slate-500">Livro</p>
+
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setIsBookDropdownOpen((current) => !current)}
+                                className="flex h-11 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 text-left text-sm text-slate-900 shadow-sm transition hover:bg-slate-50"
+                            >
+                                <span className="truncate">{selectedBookData?.name ?? 'Selecionar livro'}</span>
+                                <span className="ml-2 text-xs text-slate-500">{isBookDropdownOpen ? '▲' : '▼'}</span>
+                            </button>
+
+                            {isBookDropdownOpen ? (
+                                <div className="absolute z-10 mt-2 w-full rounded-md border border-slate-200 bg-white shadow-lg">
+                                    <div className="max-h-[360px] overflow-y-auto p-1">
+                                        {booksQuery.data?.map((book) => (
+                                            <button
+                                                key={book.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedBook(book.abbrev)
+                                                    setSelectedChapter(1)
+                                                    setIsBookDropdownOpen(false)
+                                                }}
+                                                className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition ${
+                                                    book.abbrev === effectiveBook
+                                                        ? 'bg-sky-900 text-white font-medium'
+                                                        : 'text-slate-700 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                <span className="truncate">{book.name}</span>
+                                                <span className="ml-2 text-xs opacity-75">{book.testament}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                 </aside>
@@ -290,7 +311,17 @@ export function BibleTestLoginPage() {
 
                             <div className="mx-auto max-w-3xl space-y-5">
                                 {chapterQuery.data?.verses.map((verse) => (
-                                    <p key={verse.verse} className="font-serif text-xl leading-9 text-slate-900">
+                                    <p
+                                        key={verse.verse}
+                                        onClick={() => {
+                                            setSelectedVerses((prev) => {
+                                                const next = new Set(prev)
+                                                if (next.has(verse.verse)) next.delete(verse.verse)
+                                                else next.add(verse.verse)
+                                                return next
+                                            })
+                                        }}
+                                        className={`font-serif text-xl leading-9 ${selectedVerses.has(verse.verse) ? 'bg-sky-100 rounded-md p-2 cursor-pointer' : 'text-slate-900 cursor-pointer'}`}>
                                         <sup className="mr-2 font-sans text-sm font-semibold text-sky-800">{verse.verse}</sup>
                                         {verse.text}
                                     </p>

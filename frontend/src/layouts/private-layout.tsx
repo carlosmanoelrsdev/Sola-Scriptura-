@@ -36,7 +36,7 @@ export function PrivateLayout() {
             <Link className="shrink-0 rounded-md px-3 py-2 text-slate-200 transition hover:bg-slate-800 hover:text-white md:px-0 md:py-0 md:hover:bg-transparent" to="/app/dashboard">
               Dashboard
             </Link>
-            <Link className="shrink-0 rounded-md px-3 py-2 text-slate-200 transition hover:bg-slate-800 hover:text-white md:px-0 md:py-0 md:hover:bg-transparent" to="/bible">
+            <Link className="shrink-0 rounded-md px-3 py-2 text-slate-200 transition hover:bg-slate-800 hover:text-white md:px-0 md:py-0 md:hover:bg-transparent" to="/app/biblia">
               Biblia
             </Link>
             <Link className="shrink-0 rounded-md px-3 py-2 text-slate-200 transition hover:bg-slate-800 hover:text-white md:px-0 md:py-0 md:hover:bg-transparent" to="/app/devotionals">
@@ -44,9 +44,6 @@ export function PrivateLayout() {
             </Link>
             <Link className="shrink-0 rounded-md px-3 py-2 text-slate-200 transition hover:bg-slate-800 hover:text-white md:px-0 md:py-0 md:hover:bg-transparent" to="/app/profile">
               Perfil
-            </Link>
-            <Link className="shrink-0 rounded-md px-3 py-2 text-slate-200 transition hover:bg-slate-800 hover:text-white md:px-0 md:py-0 md:hover:bg-transparent" to="/app/biblia-teste-login">
-              Biblia-teste-login
             </Link>
           </nav>
           <button

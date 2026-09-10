@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { CheckCircle2, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, useQuery as useRQQuery } from '@tanstack/react-query'
 
 import { getBibleBooks, getBibleChapter, getBibleVersions } from '@/services/bible-service'
 import { getAuthToken } from '@/services/auth-token'
 import { registerReading } from '@/services/reading-service'
+import { getDashboard } from '@/services/dashboard-service'
 
 const DEFAULT_VERSION = 'ACF'
 const DEFAULT_BOOK = 'jo'
@@ -18,21 +19,40 @@ export function BiblePage() {
   const [selectedChapter, setSelectedChapter] = useState(DEFAULT_CHAPTER)
   const token = getAuthToken()
 
-  const versionsQuery = useQuery({
+  // local read state to give instant feedback
+  const [readChapters, setReadChapters] = useState<Record<string, boolean>>({})
+  const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set())
+
+  const versionsQuery = useRQQuery({
     queryKey: ['bible', 'versions'],
     queryFn: getBibleVersions,
   })
 
-  const booksQuery = useQuery({
+  const booksQuery = useRQQuery({
     queryKey: ['bible', 'books', selectedVersion],
     queryFn: () => getBibleBooks(selectedVersion),
     enabled: Boolean(selectedVersion),
   })
 
-  const effectiveBook = useMemo(() => {
-    if (!booksQuery.data?.length) {
-      return selectedBook
+  const dashboardQuery = useRQQuery({
+    queryKey: ['dashboard'],
+    queryFn: getDashboard,
+    enabled: Boolean(token),
+  })
+
+  useEffect(() => {
+    // set last reading from dashboard as initial location when available
+    const last = (dashboardQuery.data as any)?.progress?.lastReading
+    if (last) {
+      setSelectedVersion(last.version ?? DEFAULT_VERSION)
+      setSelectedBook(last.book ?? DEFAULT_BOOK)
+      setSelectedChapter(last.chapter ?? DEFAULT_CHAPTER)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dashboardQuery.data])
+
+  const effectiveBook = useMemo(() => {
+    if (!booksQuery.data?.length) return selectedBook
 
     return booksQuery.data.some((book) => book.abbrev === selectedBook)
       ? selectedBook
@@ -44,17 +64,36 @@ export function BiblePage() {
     [booksQuery.data, effectiveBook],
   )
 
-  const chapterQuery = useQuery({
+  const chapterQuery = useRQQuery({
     queryKey: ['bible', 'chapter', selectedVersion, effectiveBook, selectedChapter],
     queryFn: () => getBibleChapter(selectedVersion, effectiveBook, selectedChapter),
     enabled: Boolean(selectedVersion && effectiveBook && selectedChapter > 0),
   })
+
+  // unique key for current chapter
+  const currentChapterKey = `${selectedVersion}-${effectiveBook}-${selectedChapter}`.toUpperCase()
+
+  const isAlreadyRead = useMemo(() => {
+    if (readChapters[currentChapterKey]) return true
+
+    const last = (dashboardQuery.data as any)?.progress?.lastReading
+    if (!last) return false
+
+    return (
+      last.version?.toUpperCase() === selectedVersion.toUpperCase() &&
+      last.book?.toLowerCase() === effectiveBook.toLowerCase() &&
+      last.chapter === selectedChapter
+    )
+  }, [dashboardQuery.data, selectedVersion, effectiveBook, selectedChapter, readChapters, currentChapterKey])
 
   const isLoading = versionsQuery.isLoading || booksQuery.isLoading || chapterQuery.isLoading
 
   const registerReadingMutation = useMutation({
     mutationFn: registerReading,
     onSuccess: () => {
+      // mark locally
+      setReadChapters((prev) => ({ ...prev, [currentChapterKey]: true }))
+      setSelectedVerses(new Set())
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
@@ -68,11 +107,25 @@ export function BiblePage() {
   }
 
   function markChapterAsRead() {
-    registerReadingMutation.mutate({
-      version: selectedVersion,
-      book: effectiveBook,
-      chapter: selectedChapter,
+    if (!token) return
+    registerReadingMutation.mutate({ version: selectedVersion, book: effectiveBook, chapter: selectedChapter })
+  }
+
+  function toggleVerse(verse: number) {
+    setSelectedVerses((prev) => {
+      const next = new Set(prev)
+      if (next.has(verse)) next.delete(verse)
+      else next.add(verse)
+      return next
     })
+  }
+
+  function markSelectedVerses() {
+    if (!token) return
+    // backend tracks chapter reading only; still register chapter and keep verses selected locally
+    registerReadingMutation.mutate({ version: selectedVersion, book: effectiveBook, chapter: selectedChapter })
+    // mark current chapter read locally (onSuccess will also do it)
+    setReadChapters((prev) => ({ ...prev, [currentChapterKey]: true }))
   }
 
   return (
@@ -139,6 +192,7 @@ export function BiblePage() {
           <input
             type="number"
             min={1}
+            max={150}
             value={selectedChapter}
             onChange={(event) => setSelectedChapter(Math.max(1, Number(event.target.value)))}
             className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-sky-700 focus:ring-2 focus:ring-sky-100"
@@ -148,9 +202,7 @@ export function BiblePage() {
 
       <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
         <aside className="hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:block">
-          <div className="mb-3 px-2 text-xs font-semibold uppercase text-slate-500">
-            Livros
-          </div>
+          <div className="mb-3 px-2 text-xs font-semibold uppercase text-slate-500">Livros</div>
           <div className="max-h-[680px] space-y-1 overflow-y-auto pr-1">
             {booksQuery.data?.map((book) => (
               <button
@@ -161,9 +213,7 @@ export function BiblePage() {
                   setSelectedChapter(1)
                 }}
                 className={`flex h-9 w-full items-center justify-between rounded-md px-2 text-left text-sm transition ${
-                  book.abbrev === effectiveBook
-                    ? 'bg-sky-900 text-white'
-                    : 'text-slate-700 hover:bg-slate-100'
+                  book.abbrev === effectiveBook ? 'bg-sky-900 text-white' : 'text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 <span className="truncate">{book.name}</span>
@@ -184,27 +234,34 @@ export function BiblePage() {
 
             <div className="flex items-center gap-2">
               {token ? (
-                <button
-                  type="button"
-                  onClick={markChapterAsRead}
-                  disabled={registerReadingMutation.isPending || chapterQuery.isError || isLoading}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-sky-900 px-3 text-sm font-medium text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {registerReadingMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" />
-                  )}
-                  Marcar como lido
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={markChapterAsRead}
+                    disabled={registerReadingMutation.isPending || chapterQuery.isError || isLoading || isAlreadyRead}
+                    className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${
+                      isAlreadyRead ? 'bg-emerald-600 text-white cursor-default shadow-sm' : 'bg-sky-900 text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60'
+                    }`}
+                  >
+                    {registerReadingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {isAlreadyRead ? 'Capítulo Lido' : 'Marcar como lido'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={markSelectedVerses}
+                    disabled={!selectedVerses.size || registerReadingMutation.isPending || chapterQuery.isError}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-white px-3 text-sm font-medium text-slate-800 border border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Marcar versículo(s)
+                  </button>
+                </>
               ) : (
-                <Link
-                  to="/login"
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 transition hover:bg-slate-50"
-                >
+                <Link to="/login" className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 transition hover:bg-slate-50">
                   Entrar para registrar
                 </Link>
               )}
+
               <button
                 type="button"
                 onClick={goToPreviousChapter}
@@ -233,27 +290,25 @@ export function BiblePage() {
           ) : chapterQuery.isError ? (
             <div className="mx-auto flex min-h-[420px] max-w-md flex-col items-center justify-center px-6 text-center">
               <h3 className="text-lg font-semibold text-slate-950">Capitulo nao encontrado</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Verifique o livro, a traducao ou o numero do capitulo e tente novamente.
-              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Verifique o livro, a traducao ou o numero do capitulo e tente novamente.</p>
             </div>
           ) : (
             <div className="px-5 py-6 md:px-8 md:py-8">
               {registerReadingMutation.isSuccess ? (
-                <p className="mx-auto mb-6 max-w-3xl rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-                  Capitulo marcado como lido.
-                </p>
+                <p className="mx-auto mb-6 max-w-3xl rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">Capitulo marcado como lido.</p>
               ) : null}
 
               {registerReadingMutation.isError ? (
-                <p className="mx-auto mb-6 max-w-3xl rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                  Este capitulo ja pode estar marcado como lido ou a sessao expirou.
-                </p>
+                <p className="mx-auto mb-6 max-w-3xl rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Este capitulo ja pode estar marcado como lido ou a sessao expirou.</p>
               ) : null}
 
               <div className="mx-auto max-w-3xl space-y-5">
                 {chapterQuery.data?.verses.map((verse) => (
-                  <p key={verse.verse} className="font-serif text-xl leading-9 text-slate-900">
+                  <p
+                    key={verse.verse}
+                    onClick={() => toggleVerse(verse.verse)}
+                    className={`font-serif text-xl leading-9 ${selectedVerses.has(verse.verse) ? 'bg-sky-100 rounded-md p-2 cursor-pointer' : 'text-slate-900'} `}
+                  >
                     <sup className="mr-2 font-sans text-sm font-semibold text-sky-800">{verse.verse}</sup>
                     {verse.text}
                   </p>

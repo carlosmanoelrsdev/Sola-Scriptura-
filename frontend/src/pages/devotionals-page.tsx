@@ -19,6 +19,7 @@ import {
   listDevotionals,
   updateDevotional,
 } from '@/services/devotional-service'
+import { getBibleBooks, getBibleChapter, getBibleVersions } from '@/services/bible-service'
 import type { Devotional, DevotionalReferenceInput } from '@/types/devotional'
 
 const EMPTY_REFERENCE: DevotionalReferenceInput = {
@@ -33,6 +34,16 @@ export function DevotionalsPage() {
   const queryClient = useQueryClient()
   const [editingDevotional, setEditingDevotional] = useState<Devotional | null>(null)
   const [references, setReferences] = useState<DevotionalReferenceInput[]>([])
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Bible helpers for reference selection/validation
+  const [selectedRefVersion, setSelectedRefVersion] = useState<string>('ACF')
+  const versionsQuery = useQuery({ queryKey: ['bible', 'versions'], queryFn: getBibleVersions })
+  const booksQuery = useQuery({
+    queryKey: ['bible', 'books', selectedRefVersion],
+    queryFn: () => getBibleBooks(selectedRefVersion),
+    enabled: Boolean(selectedRefVersion),
+  })
 
   const devotionalsQuery = useQuery({
     queryKey: ['devotionals'],
@@ -63,22 +74,35 @@ export function DevotionalsPage() {
     [devotionalsQuery.data],
   )
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setSaveError(null)
     const formData = new FormData(event.currentTarget)
+
+    const payloadReferences = references
+      .filter((reference) => reference.book.trim())
+      .map((reference) => ({
+        ...reference,
+        book: reference.book.trim(),
+        version: reference.version.trim(),
+        endVerse: reference.endVerse || null,
+      }))
+
+    // Validate that referenced chapters exist in the Bible provider
+    try {
+      await Promise.all(
+        payloadReferences.map((ref) => getBibleChapter(ref.version || 'ACF', ref.book, ref.chapter)),
+      )
+    } catch (err) {
+      setSaveError('Uma ou mais referencias nao existem na Biblia selecionada. Verifique livro e capitulo.')
+      return
+    }
 
     saveMutation.mutate({
       devotionalId: editingDevotional?.id,
       title: String(formData.get('title') ?? ''),
       content: String(formData.get('content') ?? ''),
-      references: references
-        .filter((reference) => reference.book.trim())
-        .map((reference) => ({
-          ...reference,
-          book: reference.book.trim(),
-          version: reference.version.trim(),
-          endVerse: reference.endVerse || null,
-        })),
+      references: payloadReferences,
     })
   }
 
@@ -101,7 +125,8 @@ export function DevotionalsPage() {
   }
 
   function addReference() {
-    setReferences((current) => [...current, { ...EMPTY_REFERENCE }])
+    const defaultBook = booksQuery.data?.[0]?.abbrev ?? ''
+    setReferences((current) => [...current, { ...EMPTY_REFERENCE, version: selectedRefVersion, book: defaultBook }])
   }
 
   function updateReference(index: number, value: Partial<DevotionalReferenceInput>) {
@@ -216,16 +241,37 @@ export function DevotionalsPage() {
             </div>
 
             <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium">Versao (para referencias)</label>
+                <select
+                  value={selectedRefVersion}
+                  onChange={(e) => setSelectedRefVersion(e.target.value)}
+                  className="h-9 rounded-md border border-slate-300 px-3 text-sm"
+                >
+                  {versionsQuery.data?.map((v) => (
+                    <option key={v.code} value={v.code}>
+                      {v.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {references.map((reference, index) => (
                 <div key={index} className="grid gap-3 rounded-md border border-slate-200 p-3 md:grid-cols-[1fr_90px_90px_90px_90px_40px]">
-                  <input
+                  <select
                     aria-label="Livro"
                     value={reference.book}
                     onChange={(event) => updateReference(index, { book: event.target.value })}
-                    placeholder="Livro"
-                    maxLength={80}
                     className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-sky-700 focus:ring-2 focus:ring-sky-100"
-                  />
+                  >
+                    <option value="">Escolher livro</option>
+                    {booksQuery.data?.map((b) => (
+                      <option key={b.id} value={b.abbrev}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+
                   <NumberInput
                     label="Capitulo"
                     value={reference.chapter}
@@ -267,6 +313,10 @@ export function DevotionalsPage() {
                 <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
                   Nenhuma referencia adicionada.
                 </p>
+              ) : null}
+
+              {saveError ? (
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{saveError}</p>
               ) : null}
             </div>
           </div>
