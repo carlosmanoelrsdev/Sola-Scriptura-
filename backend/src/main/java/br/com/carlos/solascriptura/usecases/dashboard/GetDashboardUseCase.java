@@ -16,7 +16,7 @@ import br.com.carlos.solascriptura.usecases.reading.GetReadingProgressUseCase;
 @Component
 public class GetDashboardUseCase {
 
-	private static final String DEFAULT_VERSE_VERSION = "ACF";
+	private static final String DEFAULT_VERSE_VERSION = "ara";
 	private static final int RECENT_DEVOTIONALS_LIMIT = 5;
 
 	private final GetReadingProgressUseCase getReadingProgressUseCase;
@@ -45,7 +45,7 @@ public class GetDashboardUseCase {
 	private BibleVerseResponseDTO getVerseOfDay() {
 		try {
 			return getRandomVerseUseCase.execute(DEFAULT_VERSE_VERSION);
-		} catch (ExternalProviderException ex) {
+		} catch (Exception ex) {
 			return null;
 		}
 	}

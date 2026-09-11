@@ -27,6 +27,7 @@ public class BibliaApiProvider implements BibleProvider {
 
 	private final RestClient restClient;
 	private final String apiKey;
+	private final OfflineBibleLoader offlineBibleLoader;
 
 	public BibliaApiProvider(
 			RestClient.Builder restClientBuilder,
@@ -34,89 +35,122 @@ public class BibliaApiProvider implements BibleProvider {
 			@Value("${app.bible.api.key}") String apiKey) {
 		this.restClient = restClientBuilder.baseUrl(apiUrl + "/api/v2").build();
 		this.apiKey = apiKey;
+		this.offlineBibleLoader = new OfflineBibleLoader();
 	}
 
 	@Override
 	public List<BibleVersionResponseDTO> getVersions() {
-		JsonNode data = getData("/versions");
-		List<BibleVersionResponseDTO> versions = new ArrayList<>();
+		try {
+			JsonNode data = getData("/versions");
+			List<BibleVersionResponseDTO> versions = new ArrayList<>();
 
-		data.forEach(item -> versions.add(new BibleVersionResponseDTO(
-				text(item, "code"),
-				text(item, "copyright"),
-				text(item, "permissions"),
-				text(item, "language"))));
+			data.forEach(item -> versions.add(new BibleVersionResponseDTO(
+					text(item, "code"),
+					text(item, "copyright"),
+					text(item, "permissions"),
+					text(item, "language"))));
 
-		return versions;
+			return versions;
+		} catch (Exception ex) {
+			return offlineBibleLoader.getVersions();
+		}
 	}
 
 	@Override
 	public List<BibleBookResponseDTO> getBooks() {
-		return readBooks("/books");
+		try {
+			return readBooks("/books");
+		} catch (Exception ex) {
+			return offlineBibleLoader.getBooks("ara");
+		}
 	}
 
 	@Override
 	public List<BibleBookResponseDTO> getBooksByVersion(String version) {
-		return readBooks("/versions/{version}/books", version);
+		try {
+			return readBooks("/versions/{version}/books", version);
+		} catch (Exception ex) {
+			return offlineBibleLoader.getBooks(version);
+		}
 	}
 
 	@Override
 	public BibleBookResponseDTO getBook(String version, String book) {
-		return toBook(getData("/versions/{version}/books/{book}", version, book));
+		try {
+			return toBook(getData("/versions/{version}/books/{book}", version, book));
+		} catch (Exception ex) {
+			return offlineBibleLoader.getBook(version, book);
+		}
 	}
 
 	@Override
 	public BibleChapterResponseDTO getChapter(String version, String book, int chapter) {
-		JsonNode data = getData("/versions/{version}/books/{book}/chapters/{chapter}", version, book, chapter);
-		JsonNode bookNode = data.path("book");
-		JsonNode chapterNode = data.path("chapter");
-		List<BibleVerseResponseDTO> verses = new ArrayList<>();
+		try {
+			JsonNode data = getData("/versions/{version}/books/{book}/chapters/{chapter}", version, book, chapter);
+			JsonNode bookNode = data.path("book");
+			JsonNode chapterNode = data.path("chapter");
+			List<BibleVerseResponseDTO> verses = new ArrayList<>();
 
-		data.path("verses").forEach(verseNode -> verses.add(new BibleVerseResponseDTO(
-				text(data, "reference") + ":" + number(verseNode, "number"),
-				text(data, "version"),
-				toBook(bookNode),
-				number(chapterNode, "number"),
-				number(verseNode, "number"),
-				text(verseNode, "text"))));
+			data.path("verses").forEach(verseNode -> verses.add(new BibleVerseResponseDTO(
+					text(data, "reference") + ":" + number(verseNode, "number"),
+					text(data, "version"),
+					toBook(bookNode),
+					number(chapterNode, "number"),
+					number(verseNode, "number"),
+					text(verseNode, "text"))));
 
-		return new BibleChapterResponseDTO(
-				text(data, "reference"),
-				text(data, "version"),
-				toBook(bookNode),
-				new BibleChapterInfoDTO(number(chapterNode, "number"), number(chapterNode, "verses")),
-				verses);
+			return new BibleChapterResponseDTO(
+					text(data, "reference"),
+					text(data, "version"),
+					toBook(bookNode),
+					new BibleChapterInfoDTO(number(chapterNode, "number"), number(chapterNode, "verses")),
+					verses);
+		} catch (Exception ex) {
+			return offlineBibleLoader.getChapter(version, book, chapter);
+		}
 	}
 
 	@Override
 	public BibleVerseResponseDTO getVerse(String version, String book, int chapter, int verse) {
-		return toVerse(getData("/versions/{version}/books/{book}/chapters/{chapter}/verses/{verse}",
-				version, book, chapter, verse));
+		try {
+			return toVerse(getData("/versions/{version}/books/{book}/chapters/{chapter}/verses/{verse}",
+					version, book, chapter, verse));
+		} catch (Exception ex) {
+			return offlineBibleLoader.getVerse(version, book, chapter, verse);
+		}
 	}
 
 	@Override
 	public BibleVerseResponseDTO getRandomVerse(String version) {
-		return toVerse(getData("/versions/{version}/random", version));
+		try {
+			return toVerse(getData("/versions/{version}/random", version));
+		} catch (Exception ex) {
+			return offlineBibleLoader.getRandomVerse(version);
+		}
 	}
 
 	@Override
 	public BibleSearchResponseDTO search(String version, String query, int limit, int offset) {
-		JsonNode data = getDataWithQuery("/versions/{version}/search", version, query, limit, offset);
-		List<BibleSearchResultDTO> results = new ArrayList<>();
+		try {
+			JsonNode data = getDataWithQuery("/versions/{version}/search", version, query, limit, offset);
+			List<BibleSearchResultDTO> results = new ArrayList<>();
 
-		data.path("results").forEach(item -> results.add(new BibleSearchResultDTO(
-				text(item, "reference"),
-				toBook(item.path("book")),
-				number(item, "chapter"),
-				number(item, "verse"),
-				text(item, "text"))));
+			data.path("results").forEach(item -> results.add(new BibleSearchResultDTO(
+					text(item, "reference"),
+					toBook(item.path("book")),
+					number(item, "chapter"),
+					number(item, "verse"),
+					text(item, "text"))));
 
-		return new BibleSearchResponseDTO(
-				text(data, "query"),
-				text(data, "version"),
-				number(data, "limit"),
-				number(data, "offset"),
-				results);
+			return new BibleSearchResponseDTO(
+					text(data, "query"),
+					text(data, "version"),
+					number(data, "limit"),
+					number(data, "offset"),
+					results);
+		} catch (Exception ex) {
+			return offlineBibleLoader.search(version, query, limit, offset);
+		}
 	}
 
 	private List<BibleBookResponseDTO> readBooks(String path, Object... uriVariables) {
