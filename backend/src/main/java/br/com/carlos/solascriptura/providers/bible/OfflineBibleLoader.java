@@ -3,10 +3,14 @@ package br.com.carlos.solascriptura.providers.bible;
 import java.io.InputStream;
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -31,6 +35,7 @@ public class OfflineBibleLoader {
 
             if (!resource.exists()) {
                 String fallbackVersion = "ara";
+
                 if (!fallbackVersion.equals(normalizedVersion)) {
                     resource = new ClassPathResource("bible/offline/" + fallbackVersion + ".json");
                 }
@@ -43,15 +48,44 @@ public class OfflineBibleLoader {
             try (InputStream is = resource.getInputStream()) {
                 return mapper.readValue(is, OfflineBibleData.class);
             }
+
         } catch (Exception ex) {
             throw new RuntimeException("Failed to load offline bible version: " + version, ex);
         }
     }
 
     public List<BibleVersionResponseDTO> getVersions() {
-        List<BibleVersionResponseDTO> versions = new ArrayList<>();
-        versions.add(new BibleVersionResponseDTO("ara", "Versão local para testes", "Acesso local habilitado", "pt"));
-        return versions;
+        try {
+            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+            Resource[] resources = resolver.getResources("classpath*:bible/offline/*.json");
+            List<BibleVersionResponseDTO> versions = new ArrayList<>();
+
+            for (Resource resource : resources) {
+                String filename = resource.getFilename();
+                if (filename == null || !filename.endsWith(".json")) {
+                    continue;
+                }
+
+                String code = filename.substring(0, filename.length() - 5).toLowerCase(Locale.ROOT);
+                versions.add(new BibleVersionResponseDTO(
+                        code,
+                        "Versão local offline",
+                        "Acesso local habilitado",
+                        "pt"));
+            }
+
+            versions.sort(Comparator.comparing(BibleVersionResponseDTO::code));
+
+            if (!versions.isEmpty()) {
+                return versions;
+            }
+        } catch (Exception ex) {
+            // Keep fallback below
+        }
+
+        List<BibleVersionResponseDTO> fallback = new ArrayList<>();
+        fallback.add(new BibleVersionResponseDTO("ara", "Versão local offline", "Acesso local habilitado", "pt"));
+        return fallback;
     }
 
     public List<BibleBookResponseDTO> getBooks(String version) {
@@ -59,11 +93,7 @@ public class OfflineBibleLoader {
         List<BibleBookResponseDTO> result = new ArrayList<>();
 
         for (OfflineBookData book : data.books()) {
-            result.add(new BibleBookResponseDTO(
-                    book.id(),
-                    book.name(),
-                    book.abbrev(),
-                    book.testament()));
+            result.add(new BibleBookResponseDTO(book.id(), book.name(), book.abbrev(), book.testament()));
         }
 
         return result;
@@ -71,15 +101,12 @@ public class OfflineBibleLoader {
 
     public BibleBookResponseDTO getBook(String version, String bookName) {
         OfflineBookData book = findBook(read(version), bookName);
+
         if (book == null) {
             return null;
         }
 
-        return new BibleBookResponseDTO(
-                book.id(),
-                book.name(),
-                book.abbrev(),
-                book.testament());
+        return new BibleBookResponseDTO(book.id(), book.name(), book.abbrev(), book.testament());
     }
 
     public BibleChapterResponseDTO getChapter(String version, String bookName, int chapterNumber) {
@@ -91,35 +118,18 @@ public class OfflineBibleLoader {
         }
 
         OfflineChapterData chapter = findChapter(book, chapterNumber);
+
         if (chapter == null) {
             return null;
         }
 
         List<BibleVerseResponseDTO> verses = new ArrayList<>();
+
         for (OfflineVerseData verse : chapter.verses()) {
-            verses.add(new BibleVerseResponseDTO(
-                    verse.reference(),
-                    verse.version(),
-                    new BibleBookResponseDTO(
-                            book.id(),
-                            book.name(),
-                            book.abbrev(),
-                            book.testament()),
-                    verse.chapter(),
-                    verse.verse(),
-                    verse.text()));
+            verses.add(new BibleVerseResponseDTO(verse.reference(), verse.version(), new BibleBookResponseDTO(book.id(), book.name(), book.abbrev(), book.testament()), verse.chapter(), verse.verse(), verse.text()));
         }
 
-        return new BibleChapterResponseDTO(
-                chapter.reference(),
-                version,
-                new BibleBookResponseDTO(
-                        book.id(),
-                        book.name(),
-                        book.abbrev(),
-                        book.testament()),
-                new BibleChapterInfoDTO(chapter.number(), chapter.verses().size()),
-                verses);
+        return new BibleChapterResponseDTO(chapter.reference(), version, new BibleBookResponseDTO(book.id(), book.name(), book.abbrev(), book.testament()), new BibleChapterInfoDTO(chapter.number(), chapter.verses().size()), verses);
     }
 
     public BibleVerseResponseDTO getVerse(String version, String bookName, int chapterNumber, int verseNumber) {
@@ -131,23 +141,14 @@ public class OfflineBibleLoader {
         }
 
         OfflineChapterData chapter = findChapter(book, chapterNumber);
+
         if (chapter == null) {
             return null;
         }
 
         for (OfflineVerseData verse : chapter.verses()) {
             if (verse.verse() == verseNumber) {
-                return new BibleVerseResponseDTO(
-                        verse.reference(),
-                        verse.version(),
-                        new BibleBookResponseDTO(
-                                book.id(),
-                                book.name(),
-                                book.abbrev(),
-                                book.testament()),
-                        verse.chapter(),
-                        verse.verse(),
-                        verse.text());
+                return new BibleVerseResponseDTO(verse.reference(), verse.version(), new BibleBookResponseDTO(book.id(), book.name(), book.abbrev(), book.testament()), verse.chapter(), verse.verse(), verse.text());
             }
         }
 
@@ -155,22 +156,44 @@ public class OfflineBibleLoader {
     }
 
     public BibleVerseResponseDTO getRandomVerse(String version) {
+
         OfflineBibleData data = read(normalizeVersion(version));
+        Random random = new Random();
+
+        List<OfflineChapterData> validChapters = new ArrayList<>();
+
         for (OfflineBookData book : data.books()) {
             for (OfflineChapterData chapter : book.chapters()) {
                 if (!chapter.verses().isEmpty()) {
-                    OfflineVerseData verse = chapter.verses().get(0);
-                    return new BibleVerseResponseDTO(
-                            verse.reference(),
-                            verse.version(),
-                            toBook(book),
-                            verse.chapter(),
-                            verse.verse(),
-                            verse.text());
+                    validChapters.add(chapter);
                 }
             }
         }
-        return null;
+
+        if (validChapters.isEmpty()) {
+            return null;
+        }
+
+        OfflineChapterData chapter = validChapters.get(random.nextInt(validChapters.size()));
+
+        OfflineVerseData verse = chapter.verses().get(random.nextInt(chapter.verses().size()));
+
+        OfflineBookData book = verse.book();
+
+        if (book == null) {
+            for (OfflineBookData currentBook : data.books()) {
+                if (currentBook.chapters().contains(chapter)) {
+                    book = currentBook;
+                    break;
+                }
+            }
+        }
+
+        if (book == null) {
+            return null;
+        }
+
+        return new BibleVerseResponseDTO(verse.reference(), verse.version(), toBook(book), verse.chapter(), verse.verse(), verse.text());
     }
 
     public BibleSearchResponseDTO search(String version, String query, int limit, int offset) {
@@ -182,18 +205,11 @@ public class OfflineBibleLoader {
         for (OfflineBookData book : data.books()) {
             for (OfflineChapterData chapter : book.chapters()) {
                 for (OfflineVerseData verse : chapter.verses()) {
+
                     String text = verse.text() == null ? "" : verse.text().toLowerCase(Locale.ROOT);
+
                     if (q.isBlank() || text.contains(q) || verse.reference().toLowerCase(Locale.ROOT).contains(q)) {
-                        results.add(new BibleSearchResultDTO(
-                                verse.reference(),
-                                new BibleBookResponseDTO(
-                                        book.id(),
-                                        book.name(),
-                                        book.abbrev(),
-                                        book.testament()),
-                                chapter.number(),
-                                verse.verse(),
-                                verse.text()));
+                        results.add(new BibleSearchResultDTO(verse.reference(), new BibleBookResponseDTO(book.id(), book.name(), book.abbrev(), book.testament()), chapter.number(), verse.verse(), verse.text()));
                     }
                 }
             }
@@ -211,6 +227,7 @@ public class OfflineBibleLoader {
         }
 
         String normalized = version.trim().toLowerCase(Locale.ROOT);
+
         return switch (normalized) {
             case "acf" -> "ara";
             case "acf-pt" -> "ara";
@@ -219,19 +236,45 @@ public class OfflineBibleLoader {
     }
 
     private OfflineBookData findBook(OfflineBibleData data, String bookName) {
-        if (bookName == null) {
+        if (bookName == null || bookName.isBlank()) {
             return null;
         }
 
+        String exactName = bookName.trim().toLowerCase(Locale.ROOT);
+
+        // 1) Correspondência exata, preservando acentos
+        for (OfflineBookData book : data.books()) {
+            String bookKey = book.name().trim().toLowerCase(Locale.ROOT);
+            String abbrevKey = book.abbrev().trim().toLowerCase(Locale.ROOT);
+
+            if (bookKey.equals(exactName) || abbrevKey.equals(exactName)) {
+                return book;
+            }
+        }
+
+        // 2) Correspondência aproximada, ignorando acentos
         String normalized = normalizeKey(bookName);
+
+        List<OfflineBookData> matches = new ArrayList<>();
 
         for (OfflineBookData book : data.books()) {
             String bookKey = normalizeKey(book.name());
             String abbrevKey = normalizeKey(book.abbrev());
 
-            if (bookKey.contains(normalized) || abbrevKey.contains(normalized)) {
-                return book;
+            if (bookKey.startsWith(normalized) || abbrevKey.startsWith(normalized)) {
+                matches.add(book);
             }
+        }
+
+        // Encontrou somente um resultado
+        if (matches.size() == 1) {
+            return matches.get(0);
+        }
+
+        // Encontrou mais de um resultado
+        // Não escolhe um livro incorretamente.
+        if (matches.size() > 1) {
+            return null;
         }
 
         return null;
@@ -242,10 +285,7 @@ public class OfflineBibleLoader {
             return "";
         }
 
-        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "")
-                .toLowerCase(Locale.ROOT)
-                .trim();
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(Locale.ROOT).trim();
 
         return normalized.replace("\u2019", "'");
     }
@@ -256,14 +296,11 @@ public class OfflineBibleLoader {
                 return chapter;
             }
         }
+
         return null;
     }
 
     private BibleBookResponseDTO toBook(OfflineBookData book) {
-        return new BibleBookResponseDTO(
-                book.id(),
-                book.name(),
-                book.abbrev(),
-                book.testament());
+        return new BibleBookResponseDTO(book.id(), book.name(), book.abbrev(), book.testament());
     }
 }

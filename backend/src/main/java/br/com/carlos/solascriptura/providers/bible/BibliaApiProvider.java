@@ -41,6 +41,15 @@ public class BibliaApiProvider implements BibleProvider {
 	@Override
 	public List<BibleVersionResponseDTO> getVersions() {
 		try {
+			List<BibleVersionResponseDTO> offlineVersions = offlineBibleLoader.getVersions();
+			if (offlineVersions != null && !offlineVersions.isEmpty()) {
+				return offlineVersions;
+			}
+		} catch (Exception ex) {
+			// fallback to external provider
+		}
+
+		try {
 			JsonNode data = getData("/versions");
 			List<BibleVersionResponseDTO> versions = new ArrayList<>();
 
@@ -59,6 +68,15 @@ public class BibliaApiProvider implements BibleProvider {
 	@Override
 	public List<BibleBookResponseDTO> getBooks() {
 		try {
+			List<BibleBookResponseDTO> offlineBooks = offlineBibleLoader.getBooks("ara");
+			if (offlineBooks != null && !offlineBooks.isEmpty()) {
+				return offlineBooks;
+			}
+		} catch (Exception ex) {
+			// fallback to external provider
+		}
+
+		try {
 			return readBooks("/books");
 		} catch (Exception ex) {
 			return offlineBibleLoader.getBooks("ara");
@@ -67,6 +85,15 @@ public class BibliaApiProvider implements BibleProvider {
 
 	@Override
 	public List<BibleBookResponseDTO> getBooksByVersion(String version) {
+		try {
+			List<BibleBookResponseDTO> offlineBooks = offlineBibleLoader.getBooks(version);
+			if (offlineBooks != null && !offlineBooks.isEmpty()) {
+				return offlineBooks;
+			}
+		} catch (Exception ex) {
+			// fallback to external provider
+		}
+
 		try {
 			return readBooks("/versions/{version}/books", version);
 		} catch (Exception ex) {
@@ -77,6 +104,15 @@ public class BibliaApiProvider implements BibleProvider {
 	@Override
 	public BibleBookResponseDTO getBook(String version, String book) {
 		try {
+			BibleBookResponseDTO offlineBook = offlineBibleLoader.getBook(version, book);
+			if (offlineBook != null) {
+				return offlineBook;
+			}
+		} catch (Exception ex) {
+			// fallback to external provider
+		}
+
+		try {
 			return toBook(getData("/versions/{version}/books/{book}", version, book));
 		} catch (Exception ex) {
 			return offlineBibleLoader.getBook(version, book);
@@ -85,6 +121,15 @@ public class BibliaApiProvider implements BibleProvider {
 
 	@Override
 	public BibleChapterResponseDTO getChapter(String version, String book, int chapter) {
+		try {
+			BibleChapterResponseDTO offlineChapter = offlineBibleLoader.getChapter(version, book, chapter);
+			if (offlineChapter != null) {
+				return offlineChapter;
+			}
+		} catch (Exception ex) {
+			// fallback to external provider
+		}
+
 		try {
 			JsonNode data = getData("/versions/{version}/books/{book}/chapters/{chapter}", version, book, chapter);
 			JsonNode bookNode = data.path("book");
@@ -113,6 +158,15 @@ public class BibliaApiProvider implements BibleProvider {
 	@Override
 	public BibleVerseResponseDTO getVerse(String version, String book, int chapter, int verse) {
 		try {
+			BibleVerseResponseDTO offlineVerse = offlineBibleLoader.getVerse(version, book, chapter, verse);
+			if (offlineVerse != null) {
+				return offlineVerse;
+			}
+		} catch (Exception ex) {
+			// fallback to external provider
+		}
+
+		try {
 			return toVerse(getData("/versions/{version}/books/{book}/chapters/{chapter}/verses/{verse}",
 					version, book, chapter, verse));
 		} catch (Exception ex) {
@@ -123,6 +177,15 @@ public class BibliaApiProvider implements BibleProvider {
 	@Override
 	public BibleVerseResponseDTO getRandomVerse(String version) {
 		try {
+			BibleVerseResponseDTO offlineRandomVerse = offlineBibleLoader.getRandomVerse(version);
+			if (offlineRandomVerse != null) {
+				return offlineRandomVerse;
+			}
+		} catch (Exception ex) {
+			// fallback to external provider
+		}
+
+		try {
 			return toVerse(getData("/versions/{version}/random", version));
 		} catch (Exception ex) {
 			return offlineBibleLoader.getRandomVerse(version);
@@ -131,6 +194,15 @@ public class BibliaApiProvider implements BibleProvider {
 
 	@Override
 	public BibleSearchResponseDTO search(String version, String query, int limit, int offset) {
+		try {
+			BibleSearchResponseDTO offlineSearch = offlineBibleLoader.search(version, query, limit, offset);
+			if (offlineSearch != null) {
+				return offlineSearch;
+			}
+		} catch (Exception ex) {
+			// fallback to external provider
+		}
+
 		try {
 			JsonNode data = getDataWithQuery("/versions/{version}/search", version, query, limit, offset);
 			List<BibleSearchResultDTO> results = new ArrayList<>();
