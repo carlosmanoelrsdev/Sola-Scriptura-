@@ -1,16 +1,29 @@
 import { useMemo, useState, useEffect } from 'react'
 import { CheckCircle2, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient, useQuery as useRQQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery as useRQQuery } from '@tanstack/react-query'
 
 import { getBibleBooks, getBibleChapter, getBibleVersions } from '@/services/bible-service'
 import { getAuthToken } from '@/services/auth-token'
 import { registerReading } from '@/services/reading-service'
 import { getDashboard } from '@/services/dashboard-service'
 
-const DEFAULT_VERSION = 'ACF'
+const DEFAULT_VERSION = 'ARA'
 const DEFAULT_BOOK = 'jo'
 const DEFAULT_CHAPTER = 3
+
+function resolveBookAbbrev(candidate: string, books: Array<{ abbrev: string; name?: string }> = []) {
+  if (!candidate) return candidate
+
+  const lowerCandidate = candidate.toLowerCase()
+  const exactMatch = books.find((book) => book.abbrev.toLowerCase() === lowerCandidate)
+  if (exactMatch) return exactMatch.abbrev
+
+  if (lowerCandidate === 'jó') return 'jó'
+
+  if (!books.length) return candidate
+  return books[0].abbrev
+}
 
 export function BiblePage() {
   const queryClient = useQueryClient()
@@ -51,16 +64,14 @@ export function BiblePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardQuery.data])
 
-  const effectiveBook = useMemo(() => {
-    if (!booksQuery.data?.length) return selectedBook
-
-    return booksQuery.data.some((book) => book.abbrev === selectedBook)
-      ? selectedBook
-      : booksQuery.data[0].abbrev
-  }, [booksQuery.data, selectedBook])
+  const effectiveBook = useMemo(() => resolveBookAbbrev(selectedBook, booksQuery.data ?? []), [booksQuery.data, selectedBook])
 
   const selectedBookData = useMemo(
-    () => booksQuery.data?.find((book) => book.abbrev === effectiveBook),
+    () =>
+      booksQuery.data?.find((book) => book.abbrev === effectiveBook) ??
+      (effectiveBook.toLowerCase() === 'jó'
+        ? { id: 18, name: 'Jó', abbrev: 'jó', testament: 'Antigo Testamento' }
+        : undefined),
     [booksQuery.data, effectiveBook],
   )
 

@@ -8,9 +8,22 @@ import { getAuthToken } from '@/services/auth-token'
 import { registerReading } from '@/services/reading-service'
 import { getDashboard } from '@/services/dashboard-service'
 
-const DEFAULT_VERSION = 'ACF'
+const DEFAULT_VERSION = 'ARA'
 const DEFAULT_BOOK = 'gn'
 const DEFAULT_CHAPTER = 1
+
+function resolveBookAbbrev(candidate: string, books: Array<{ abbrev: string; name?: string }> = []) {
+    if (!candidate) return candidate
+
+    const lowerCandidate = candidate.toLowerCase()
+    const exactMatch = books.find((book) => book.abbrev.toLowerCase() === lowerCandidate)
+    if (exactMatch) return exactMatch.abbrev
+
+    if (lowerCandidate === 'jó') return 'jó'
+
+    if (!books.length) return candidate
+    return books[0].abbrev
+}
 
 export function BibleLoginPage() {
     const queryClient = useQueryClient()
@@ -42,18 +55,17 @@ export function BibleLoginPage() {
         enabled: Boolean(selectedVersion),
     })
 
-    const effectiveBook = useMemo(() => {
-        if (!booksQuery.data?.length) {
-            return selectedVersion === selectedVersion ? selectedBook : selectedBook
-        }
-
-        return booksQuery.data.some((book) => book.abbrev === selectedBook)
-            ? selectedBook
-            : booksQuery.data[0].abbrev
-    }, [booksQuery.data, selectedBook, selectedVersion])
+    const effectiveBook = useMemo(
+        () => resolveBookAbbrev(selectedBook, booksQuery.data ?? []),
+        [booksQuery.data, selectedBook],
+    )
 
     const selectedBookData = useMemo(
-        () => booksQuery.data?.find((book) => book.abbrev === effectiveBook),
+        () =>
+            booksQuery.data?.find((book) => book.abbrev === effectiveBook) ??
+            (effectiveBook.toLowerCase() === 'jó'
+                ? { id: 18, name: 'Jó', abbrev: 'jó', testament: 'Antigo Testamento' }
+                : undefined),
         [booksQuery.data, effectiveBook],
     )
 
