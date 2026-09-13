@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -8,9 +8,11 @@ import { getAuthToken } from '@/services/auth-token'
 import { registerReading } from '@/services/reading-service'
 import { getDashboard } from '@/services/dashboard-service'
 
+
 const DEFAULT_VERSION = 'ARA'
 const DEFAULT_BOOK = 'gn'
 const DEFAULT_CHAPTER = 1
+
 
 function resolveBookAbbrev(candidate: string, books: Array<{ abbrev: string; name?: string }> = []) {
     if (!candidate) return candidate
@@ -26,6 +28,9 @@ function resolveBookAbbrev(candidate: string, books: Array<{ abbrev: string; nam
 }
 
 export function BibleLoginPage() {
+
+
+
     const queryClient = useQueryClient()
     const [selectedVersion, setSelectedVersion] = useState(DEFAULT_VERSION)
     const [selectedBook, setSelectedBook] = useState(DEFAULT_BOOK)
@@ -43,6 +48,16 @@ export function BibleLoginPage() {
         queryFn: getDashboard,
         enabled: Boolean(token),
     })
+
+    useEffect(() => {
+        const lastReading = dashboardQuery.data?.progress?.lastReading
+
+        if (!lastReading) return
+
+        setSelectedBook(lastReading.book)
+        setSelectedChapter(lastReading.chapter)
+    }, [dashboardQuery.data])
+
 
     const versionsQuery = useQuery({
         queryKey: ['bible', 'versions'],

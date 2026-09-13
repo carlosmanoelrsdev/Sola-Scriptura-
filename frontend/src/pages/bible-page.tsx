@@ -26,6 +26,7 @@ function resolveBookAbbrev(candidate: string, books: Array<{ abbrev: string; nam
 }
 
 export function BiblePage() {
+
   const queryClient = useQueryClient()
   const [selectedVersion, setSelectedVersion] = useState(DEFAULT_VERSION)
   const [selectedBook, setSelectedBook] = useState(DEFAULT_BOOK)
