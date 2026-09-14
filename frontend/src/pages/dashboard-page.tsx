@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 
 import { getDashboard } from '@/services/dashboard-service'
+import { getCurrentUser } from "@/services/user-service.ts";
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
@@ -16,6 +17,11 @@ export function DashboardPage() {
     queryFn: getDashboard,
   })
 
+  const userQuery = useQuery({
+    queryKey: ['current-user'],
+    queryFn: getCurrentUser,
+  })
+
   const dashboard = dashboardQuery.data
   const progress = dashboard?.progress
 
@@ -25,8 +31,12 @@ export function DashboardPage() {
         <div>
           <p className="text-sm font-medium uppercase text-sky-700">Area pessoal</p>
           <h1 className="mt-2 font-serif text-3xl font-semibold text-slate-950 md:text-4xl">Dashboard</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-900">
+            Olá, {userQuery.data?.name}
+          </p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-700">
-            Acompanhe sua leitura, progresso e devocionais recentes em um so lugar.
+            Vamos nos aproximar de Deus hoje!<br />
+            Acompanhe sua leitura, progresso e devocionais recentes em um só lugar.
           </p>
         </div>
 
